@@ -5,13 +5,20 @@ import abi from "./contracts/MyFirstChatroom.json";
 function App() {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [msg2send, setMsg2Send] = useState("");
+  // const [msg2send, setMsg2Send] = useState("");
   const [messages, setMessages] = useState([]);
   const [customerAddress, setCustomerAddress] = useState(null);
+  const [inputValue, setInputValue] = useState({ msg2send: ""});
+  const [error, setError] = useState(null);
 
 
   const contractAddress = '0x57d5AE9966ce94792420a1fED9003d62d925B6b0';
   const contractABI = abi.abi;
+
+  function PreviousMessage(props){
+    return (<tr><td style={{textAlign: 'left'}} >{props.left}</td><td style={{textAlign: 'right'}} >{props.right}</td></tr>);
+
+  }
 
   const checkIfWalletIsConnected = async () => {
     try {
@@ -21,6 +28,7 @@ function App() {
         setIsWalletConnected(true);
         setCustomerAddress(account);
         console.log("Account Connected: ", account);
+        getAllMessages();
       } else {
         setError("Please install a MetaMask wallet to use our bank.");
         console.log("No Metamask detected");
@@ -31,19 +39,21 @@ function App() {
   }
 
 
-  const sendMessage = async (event) => {
+  const sendMessageHandler = async (event) => {
     event.preventDefault();
     try {
       if (window.ethereum) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const chatroomContract = new ethers.Contract(contractAddress, contractABI, signer);
-
-        const newmsg = await chatroomContract.publishMessage(msg2send);
+        setIsSending(true);
+        const newmsg = await chatroomContract.publishMessage(inputValue.msg2send);
         console.log("Sending message...");
         await newmsg.wait();
         console.log("Message is sent", newmsg);
+        setInputValue({msg2send:""});
         getAllMessages();
+        setIsSending(false);
 
       } else {
         console.log("Ethereum object not found, install Metamask.");
@@ -64,11 +74,16 @@ function App() {
 
 
         let allmsgs = await chatroomContract.getAllMessages();
-        allmsgs = allmsgs.map((x)=>{
-          x.isMe = false;
+        allmsgs = allmsgs.map((x,i)=>{
+          let res = {isMe:false,id:i};
           if (x.authorAddress.toLowerCase() === account.toLowerCase()) {
-            x.isMe = true;
+            res.left = x.post;
+            res.right = "";
+          }else{
+            res.left = "";
+            res.right = x.post;            
           }
+          return res;
         })
         setMessages(allmsgs);
         
@@ -76,69 +91,55 @@ function App() {
 
       } else {
         console.log("Ethereum object not found, install Metamask.");
-        setError("Please install a MetaMask wallet to use our bank.");
+        setError("Please install a MetaMask wallet to use our chatroom.");
       }
     } catch (error) {
       console.log(error)
     }
   }
 
+
+  const handleInputChange = (event) => {
+    setInputValue(prevFormData => ({ [event.target.name]: event.target.value }));
+  }  
+
   useEffect(() => {
     checkIfWalletIsConnected();
-    getBankName();
-    getbankOwnerHandler();
-    customerBalanceHandler()
+    getAllMessages();
   }, [isWalletConnected])
 
   return (
     <main className="main-container">
-      <h2 className="headline"><span className="headline-gradient">Bank Contract Project</span> 💰</h2>
+      <h2 className="headline"><span className="headline-gradient">Chatroom Dapp</span> 💰</h2>
+      <table>
+        <tbody>
+          {messages.map((msg) => <PreviousMessage key={msg.id} left={msg.left} right={msg.right} />)}
+        </tbody>
+      </table>
+
+
+
+
       <section className="customer-section px-10 pt-5 pb-10">
-        {error && <p className="text-2xl text-red-700">{error}</p>}
-        <div className="mt-5">
-          {currentBankName === "" && isBankerOwner ?
-            <p>"Setup the name of your bank." </p> :
-            <p className="text-3xl font-bold">{currentBankName}</p>
-          }
-        </div>
-        <div className="mt-7 mb-9">
-          <form className="form-style">
-            <input
-              type="text"
-              className="input-style"
-              onChange={handleInputChange}
-              name="deposit"
-              placeholder="0.0000 ETH"
-              value={inputValue.deposit}
-            />
-            <button
-              className="btn-purple"
-              onClick={deposityMoneyHandler}>Deposit Money In ETH</button>
-          </form>
-        </div>
-        <div className="mt-10 mb-10">
-          <form className="form-style">
-            <input
-              type="text"
-              className="input-style"
-              onChange={handleInputChange}
-              name="withdraw"
-              placeholder="0.0000 ETH"
-              value={inputValue.withdraw}
-            />
-            <button
-              className="btn-purple"
-              onClick={withDrawMoneyHandler}>
-              Withdraw Money In ETH
-            </button>
-          </form>
-        </div>
-        <div className="mt-5">
-          <p><span className="font-bold">Customer Balance: </span>{customerTotalBalance}</p>
-        </div>
-        <div className="mt-5">
-          <p><span className="font-bold">Bank Owner Address: </span>{bankOwnerAddress}</p>
-        </div>
+        {
+          isSending?<div className="loader"></div>:
+            <div className="mt-7 mb-9">
+            <form className="form-style">
+              <input
+                type="text"
+                className="input-style"
+                onChange={handleInputChange}
+                name="msg2send"
+                placeholder="Your Message"
+                value={inputValue.msg2send}
+              />
+              <button
+                className="btn-purple"
+                onClick={sendMessageHandler}>Send</button>
+            </form>
+          </div>
+        }
+        
         <div className="mt-5">
           {isWalletConnected && <p><span className="font-bold">Your Wallet Address: </span>{customerAddress}</p>}
           <button className="btn-connect" onClick={checkIfWalletIsConnected}>
@@ -146,30 +147,6 @@ function App() {
           </button>
         </div>
       </section>
-      {
-        isBankerOwner && (
-          <section className="bank-owner-section">
-            <h2 className="text-xl border-b-2 border-indigo-500 px-10 py-4 font-bold">Bank Admin Panel</h2>
-            <div className="p-10">
-              <form className="form-style">
-                <input
-                  type="text"
-                  className="input-style"
-                  onChange={handleInputChange}
-                  name="bankName"
-                  placeholder="Enter a Name for Your Bank"
-                  value={inputValue.bankName}
-                />
-                <button
-                  className="btn-grey"
-                  onClick={setBankNameHandler}>
-                  Set Bank Name
-                </button>
-              </form>
-            </div>
-          </section>
-        )
-      }
     </main>
   );
 }
