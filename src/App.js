@@ -30,7 +30,7 @@ function App() {
         console.log("Account Connected: ", account);
         getAllMessages();
       } else {
-        setError("Please install a MetaMask wallet to use our bank.");
+        setError("Please install a MetaMask wallet to use our chatroom.");
         console.log("No Metamask detected");
       }
     } catch (error) {
